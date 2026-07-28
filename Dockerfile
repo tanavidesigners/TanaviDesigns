@@ -10,13 +10,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/app ./app
-COPY --from=builder /app/worker ./worker
-COPY --from=builder /app/db ./db
-COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app ./
+RUN mkdir -p .wrangler/logs
 
 EXPOSE 3000
 CMD ["npm", "run", "start"]
