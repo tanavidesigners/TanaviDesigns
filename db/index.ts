@@ -4,12 +4,8 @@ import * as schema from "./schema";
 export function getDb() {
   let dbBinding: any = (globalThis as any).DB || (process as any).env?.DB;
 
-  if (!dbBinding) {
-    try {
-      // @ts-ignore
-      const cf = typeof require !== "undefined" ? require("cloudflare:workers") : null;
-      dbBinding = cf?.env?.DB;
-    } catch {}
+  if (!dbBinding && typeof globalThis !== "undefined") {
+    dbBinding = (globalThis as any).__env__?.DB || (globalThis as any).env?.DB;
   }
 
   if (!dbBinding) {
