@@ -1,0 +1,21 @@
+services:
+  tanavi-designs:
+    build: .
+    container_name: tanavi-designs
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_WHATSAPP_NUMBER=${NEXT_PUBLIC_WHATSAPP_NUMBER:-919482245679}
+      - NEXT_PUBLIC_WHATSAPP_DEFAULT_MESSAGE=${NEXT_PUBLIC_WHATSAPP_DEFAULT_MESSAGE:-Hello Tanavi, I would like to know more about your latest designer collection.}
+      - NEXT_PUBLIC_RAZORPAY_KEY_ID=${NEXT_PUBLIC_RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://tanavibydeepika.com}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tanavi.rule=Host(`tanavibydeepika.com`) || Host(`www.tanavibydeepika.com`) || Host(`srv1789581.hstgr.cloud`)"
+      - "traefik.http.routers.tanavi.entrypoints=web"
+      - "traefik.http.services.tanavi.loadbalancer.server.port=3000"

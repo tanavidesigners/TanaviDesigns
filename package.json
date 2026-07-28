@@ -11,7 +11,11 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 execute tanavi-d1 --local --file=./drizzle/0000_bouncy_pixie.sql",
+    "db:seed:local": "wrangler d1 execute tanavi-d1 --local --file=./drizzle/seed.sql",
+    "db:migrate:prod": "wrangler d1 execute tanavi-d1 --remote --file=./drizzle/0000_bouncy_pixie.sql",
+    "db:seed:prod": "wrangler d1 execute tanavi-d1 --remote --file=./drizzle/seed.sql"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
