@@ -21,6 +21,6 @@ services:
       - "traefik.http.routers.tanavi.rule=Host(`tanavidesigns.com`) || Host(`www.tanavidesigns.com`) || Host(`tanavibydeepika.com`) || Host(`www.tanavibydeepika.com`) || Host(`srv1789581.hstgr.cloud`)"
       - "traefik.http.routers.tanavi.entrypoints=web,websecure"
       - "traefik.http.routers.tanavi.tls=true"
-      - "traefik.http.routers.tanavi.tls.certresolver=myresolver"
+      - "traefik.http.routers.tanavi.tls.certresolver=letsencrypt"
       - "traefik.http.services.tanavi.loadbalancer.server.port=3000"
 
