@@ -12,6 +12,14 @@ export const users = sqliteTable("users", {
   name: text("name"),
   phone: text("phone"),
   role: text("role", { enum: ["CUSTOMER", "ADMIN", "STAFF"] }).notNull().default("CUSTOMER"),
+  passwordHash: text("password_hash"),
+  ...timestamps,
+});
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: text("expires_at").notNull(),
   ...timestamps,
 });
 export const addresses = sqliteTable("addresses", { id:text("id").primaryKey(), userId:text("user_id").references(()=>users.id), name:text("name").notNull(), phone:text("phone").notNull(), line1:text("line1").notNull(), line2:text("line2"), city:text("city").notNull(), state:text("state").notNull(), pinCode:text("pin_code").notNull(), ...timestamps });

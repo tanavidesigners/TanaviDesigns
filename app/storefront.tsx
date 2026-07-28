@@ -55,6 +55,534 @@ function CheckoutPage({cart,clear}:{cart:{p:Product;q:number}[];clear:()=>void})
 function SearchPage(){const [q,setQ]=useState("");const r=products.filter(p=>(p.name+" "+p.kind+" "+p.category).toLowerCase().includes(q.toLowerCase()));return <main><section className="page-hero"><span className="eyebrow">Find a piece</span><h1>Search Tanavi</h1><div className="field" style={{maxWidth:620,margin:"28px auto"}}><input autoFocus role="combobox" aria-expanded={!!q} value={q} onChange={e=>setQ(e.target.value)} placeholder="Try “saree”, “Noor” or “festive”…" style={{padding:16,borderRadius:999}}/></div></section>{q&&<section className="section compact"><div className="section-head"><h2>{r.length?`${r.length} results`:"Nothing quite like that"}</h2></div><div className="product-grid">{(r.length?r:products.slice(0,4)).map(p=><ProductCard p={p} key={p.slug}/>)}</div></section>}</main>}
 function SuccessPage(){return <main><div className="success"><div className="success-mark">✓</div><span className="eyebrow">Order confirmed</span><h1>Thank you, beautifully.</h1><p>Your order <strong>TNV-24078</strong> is confirmed. We have sent the details to your email and will let you know when your pieces leave our studio.</p><a className="btn" href="/orders/TNV-24078">Track your order</a></div></main>}
 function OrderPage(){return <main><section className="page-hero"><span className="eyebrow">Order TNV-24078</span><h1>Your order is being prepared</h1><p>Confirmed → <strong>In the studio</strong> → Shipped → Delivered</p></section><div className="success" style={{textAlign:"left",marginTop:0}}><h3>Estimated dispatch</h3><p>Friday, 31 July</p><hr style={{border:0,borderTop:"1px solid var(--border)"}}/><p className="meta">Noor · Hand-block kurta set<br/>Size M · Rose · Quantity 1</p><a className="btn secondary full" href="https://wa.me/919876543210?text=Hello%20Tanavi%2C%20I%20need%20help%20with%20order%20TNV-24078.">Ask for order support</a></div></main>}
-function AdminPage(){return <main className="admin"><div className="admin-top"><div><span className="eyebrow">Tanavi studio</span><h1 style={{margin:"6px 0"}}>Good morning, Deepika.</h1></div><a className="btn" href="/">View storefront</a></div><div className="stats"><div className="stat"><span className="meta">Orders</span><strong>38</strong><span className="eyebrow">↑ 12%</span></div><div className="stat"><span className="meta">Revenue</span><strong>₹96,400</strong><span className="eyebrow">↑ 22%</span></div><div className="stat"><span className="meta">Avg. order</span><strong>₹2,537</strong></div><div className="stat"><span className="meta">Low stock</span><strong>3 pieces</strong></div></div><div className="admin-grid"><div className="admin-card"><h3>Revenue by week</h3><div className="bar-chart">{[42,58,47,76,62,88,95,70].map((h,i)=><div className="bar" key={i} style={{height:`${h}%`}}/>)}</div></div><div className="admin-card"><h3>Inventory attention</h3>{products.slice(0,5).map(p=><div className="inventory-row" key={p.slug}><span><strong>{p.name}</strong><br/><span className="meta">{p.kind}</span></span><span className="status">{p.stock} left</span></div>)}</div></div></main>}
+function AdminLoginPage({ onLogin }: { onLogin: (user: { email: string; role: string; name: string }) => void }) {
+  const [email, setEmail] = useState("admin@tanavidesigns.com");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-export function Storefront(){const [mounted,setMounted]=useState(false);const [path,setPath]=useState("/");const [cart,setCart]=useState<{p:Product;q:number}[]>([]);useEffect(()=>{setMounted(true);if(typeof window!=="undefined"){setPath(window.location.pathname);try{setCart(JSON.parse(localStorage.getItem("tanavi-cart")||"[]"))}catch{}}const handlePop=()=>{if(typeof window!=="undefined")setPath(window.location.pathname)};window.addEventListener("popstate",handlePop);return ()=>window.removeEventListener("popstate",handlePop)},[]);const save=(next:{p:Product;q:number}[])=>{setCart(next);if(typeof window!=="undefined")localStorage.setItem("tanavi-cart",JSON.stringify(next))};const add=(p:Product)=>save(cart.some(x=>x.p.slug===p.slug)?cart.map(x=>x.p.slug===p.slug?{...x,q:x.q+1}:x):[...cart,{p,q:1}]);const update=(s:string,d:number)=>save(cart.map(x=>x.p.slug===s?{...x,q:Math.max(1,x.q+d)}:x));const remove=(s:string)=>save(cart.filter(x=>x.p.slug!==s));const wish=(p:Product)=>{if(typeof window==="undefined")return;const w=JSON.parse(localStorage.getItem("tanavi-wishlist")||"[]");if(!w.includes(p.slug))localStorage.setItem("tanavi-wishlist",JSON.stringify([...w,p.slug]))};const activePath=mounted?path:"/";let page:React.ReactNode;if(activePath==="/")page=<HomePage wish={wish}/>;else if(activePath==="/shop"||activePath.startsWith("/category/")||activePath.startsWith("/collections/"))page=<ShopPage wish={wish} path={activePath}/>;else if(activePath.startsWith("/products/"))page=<ProductPage add={add} wish={wish} path={activePath}/>;else if(activePath==="/cart")page=<CartPage cart={cart} update={update} remove={remove}/>;else if(activePath==="/checkout")page=<CheckoutPage cart={cart} clear={()=>save([])}/>;else if(activePath==="/search")page=<SearchPage/>;else if(activePath==="/payment/success")page=<SuccessPage/>;else if(activePath.startsWith("/orders/"))page=<OrderPage/>;else if(activePath.startsWith("/admin"))return <AdminPage/>;else page=<div className="notfound"><h1>That page has wandered.</h1><a className="btn" href="/">Return home</a></div>;return <Layout cartCount={cart.reduce((a,x)=>a+x.q,0)}>{page}</Layout>}
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+      onLogin(data.user);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="admin" style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
+      <div className="admin-card" style={{ width: "100%", maxWidth: 420, padding: 32 }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <span className="eyebrow">Studio Portal</span>
+          <h2 style={{ margin: "8px 0" }}>Tanavi Admin & Staff Sign In</h2>
+          <p className="meta">Enter your studio credentials to manage pieces, orders and inventory.</p>
+        </div>
+
+        {error && (
+          <div style={{ background: "#fde8e8", color: "#9b1c1c", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label>Email address</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="admin@tanavidesigns.com" />
+          </div>
+          <div className="field">
+            <label>Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
+          </div>
+          <button className="btn full" disabled={loading} style={{ marginTop: 12 }}>
+            {loading ? "Signing in…" : "Sign In to Studio"}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.6 }}>
+          <strong>Default Studio Accounts:</strong>
+          <br />
+          👑 <strong>Admin:</strong> admin@tanavidesigns.com / TanaviAdmin2026!
+          <br />
+          💼 <strong>Staff:</strong> staff@tanavidesigns.com / TanaviStaff2026!
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function AdminPortalPage({ user, onLogout }: { user: { email: string; role: string; name: string }; onLogout: () => void }) {
+  const [tab, setTab] = useState<"overview" | "catalog" | "orders" | "staff">("catalog");
+  const [items, setItems] = useState<Product[]>(products);
+  const [ordersList, setOrdersList] = useState<{ id: string; orderNumber: string; email: string; status: string; total: number; createdAt: string }[]>([
+    { id: "ord_1", orderNumber: "TNV-24078", email: "kavya@example.com", status: "IN_STUDIO", total: 2450, createdAt: "2026-07-28" },
+    { id: "ord_2", orderNumber: "TNV-24079", email: "ananya@example.com", status: "PENDING_PAYMENT", total: 4850, createdAt: "2026-07-28" },
+    { id: "ord_3", orderNumber: "TNV-24080", email: "radhika@example.com", status: "SHIPPED", total: 3800, createdAt: "2026-07-27" },
+  ]);
+
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<Product | null>(null);
+  const [deletingItem, setDeletingItem] = useState<Product | null>(null);
+
+  // Form states
+  const [formData, setFormData] = useState({
+    name: "",
+    kind: "Hand-block kurta set",
+    category: "Kurta sets",
+    price: 2450,
+    stock: 5,
+    fabric: "Cotton",
+    occasion: "Everyday",
+    image: "https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=1200&q=85",
+  });
+
+  const fetchItems = async () => {
+    try {
+      const res = await fetch("/api/admin/products");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.products && data.products.length) {
+          setItems(data.products);
+        }
+      }
+    } catch {}
+  };
+
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch("/api/admin/orders");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.orders && data.orders.length) {
+          setOrdersList(data.orders);
+        }
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchItems();
+    fetchOrders();
+  }, []);
+
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          categoryName: formData.category,
+          price: formData.price,
+          stock: formData.stock,
+          fabric: formData.fabric,
+          occasion: formData.occasion,
+          image: formData.image,
+          description: `Hand-finished ${formData.name} piece in ${formData.fabric}.`,
+          status: "PUBLISHED",
+        }),
+      });
+      if (res.ok) {
+        setShowAddModal(false);
+        setFormData({
+          name: "",
+          kind: "Hand-block kurta set",
+          category: "Kurta sets",
+          price: 2450,
+          stock: 5,
+          fabric: "Cotton",
+          occasion: "Everyday",
+          image: "https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=1200&q=85",
+        });
+        const newProd: Product = {
+          slug: formData.name.toLowerCase().replaceAll(" ", "-") + "-" + Date.now().toString(36).slice(-4),
+          name: formData.name,
+          kind: formData.kind,
+          price: Number(formData.price),
+          category: formData.category,
+          badge: "New",
+          image: formData.image,
+          color: "Rose",
+          fabric: formData.fabric,
+          occasion: formData.occasion,
+          stock: Number(formData.stock),
+        };
+        setItems((prev) => [newProd, ...prev]);
+        fetchItems();
+      }
+    } catch (err) {
+      alert("Failed to create post: " + String(err));
+    }
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    try {
+      await fetch(`/api/admin/products/${editingItem.slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editingItem.name,
+          price: editingItem.price,
+          fabric: editingItem.fabric,
+          stock: editingItem.stock,
+        }),
+      });
+      setItems((prev) => prev.map((x) => (x.slug === editingItem.slug ? editingItem : x)));
+      setEditingItem(null);
+    } catch {
+      setItems((prev) => prev.map((x) => (x.slug === editingItem.slug ? editingItem : x)));
+      setEditingItem(null);
+    }
+  };
+
+  const handleDelete = async (slug: string) => {
+    try {
+      await fetch(`/api/admin/products/${slug}`, { method: "DELETE" });
+      setItems((prev) => prev.filter((x) => x.slug !== slug));
+      setDeletingItem(null);
+    } catch {
+      setItems((prev) => prev.filter((x) => x.slug !== slug));
+      setDeletingItem(null);
+    }
+  };
+
+  const handleOrderStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+      setOrdersList((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
+    } catch {
+      setOrdersList((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
+    }
+  };
+
+  return (
+    <main className="admin">
+      <div className="admin-top">
+        <div>
+          <span className="eyebrow">Tanavi Studio · {user.role} Portal</span>
+          <h1 style={{ margin: "6px 0" }}>Good morning, {user.name}.</h1>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <a className="btn secondary" href="/">View Storefront</a>
+          <button className="btn ink" onClick={onLogout}>Sign Out</button>
+        </div>
+      </div>
+
+      {/* Tabs Header */}
+      <div className="chips" style={{ margin: "24px 0 16px" }}>
+        <button className={`chip ${tab === "catalog" ? "active" : ""}`} onClick={() => setTab("catalog")}>🛍️ Catalog Posts ({items.length})</button>
+        <button className={`chip ${tab === "orders" ? "active" : ""}`} onClick={() => setTab("orders")}>📦 Order Fulfillment ({ordersList.length})</button>
+        <button className={`chip ${tab === "overview" ? "active" : ""}`} onClick={() => setTab("overview")}>📊 Studio Analytics</button>
+        {user.role === "ADMIN" && (
+          <button className={`chip ${tab === "staff" ? "active" : ""}`} onClick={() => setTab("staff")}>👥 Staff Accounts</button>
+        )}
+      </div>
+
+      {/* Tab 1: Catalog & Posts Management */}
+      {tab === "catalog" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Product Catalog & Studio Posts</h2>
+              <span className="meta">Create, edit and manage pieces displayed on tanavidesigns.com</span>
+            </div>
+            <button className="btn" onClick={() => setShowAddModal(true)}>
+              ➕ Post New Piece
+            </button>
+          </div>
+
+          <div className="admin-card" style={{ padding: 0, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "var(--soft)", borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ padding: 14 }}>Piece</th>
+                  <th style={{ padding: 14 }}>Category</th>
+                  <th style={{ padding: 14 }}>Price</th>
+                  <th style={{ padding: 14 }}>Stock</th>
+                  <th style={{ padding: 14 }}>Fabric</th>
+                  <th style={{ padding: 14, textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((p) => (
+                  <tr key={p.slug} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
+                      <img src={p.image} alt={p.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover" }} />
+                      <div>
+                        <strong>{p.name}</strong>
+                        <div className="meta">{p.kind}</div>
+                      </div>
+                    </td>
+                    <td style={{ padding: 14 }}>{p.category}</td>
+                    <td style={{ padding: 14 }}><strong>{money(p.price)}</strong></td>
+                    <td style={{ padding: 14 }}>
+                      <span className="status">{p.stock} left</span>
+                    </td>
+                    <td style={{ padding: 14 }}>{p.fabric}</td>
+                    <td style={{ padding: 14, textAlign: "right" }}>
+                      <button className="chip" style={{ marginRight: 6 }} onClick={() => setEditingItem({ ...p })}>
+                        ✏️ Edit
+                      </button>
+                      {user.role === "ADMIN" && (
+                        <button className="chip" style={{ background: "#fde8e8", borderColor: "#f8b4b4", color: "#9b1c1c" }} onClick={() => setDeletingItem(p)}>
+                          🗑️ Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: Orders Fulfillment */}
+      {tab === "orders" && (
+        <div>
+          <div style={{ marginBottom: 20 }}>
+            <h2 style={{ margin: 0 }}>Customer Orders & Dispatch</h2>
+            <span className="meta">Manage order preparation, shipping and delivery tracking</span>
+          </div>
+
+          <div className="admin-card" style={{ padding: 0, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "var(--soft)", borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ padding: 14 }}>Order #</th>
+                  <th style={{ padding: 14 }}>Customer</th>
+                  <th style={{ padding: 14 }}>Date</th>
+                  <th style={{ padding: 14 }}>Total</th>
+                  <th style={{ padding: 14 }}>Fulfillment Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordersList.map((ord) => (
+                  <tr key={ord.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: 14 }}><strong>{ord.orderNumber}</strong></td>
+                    <td style={{ padding: 14 }}>{ord.email}</td>
+                    <td style={{ padding: 14 }}>{ord.createdAt}</td>
+                    <td style={{ padding: 14 }}><strong>{money(ord.total)}</strong></td>
+                    <td style={{ padding: 14 }}>
+                      <select
+                        value={ord.status}
+                        onChange={(e) => handleOrderStatusChange(ord.id, e.target.value)}
+                        style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid var(--border)", background: "#fff", fontSize: 12, fontWeight: 600 }}
+                      >
+                        <option value="PENDING_PAYMENT">Pending Payment</option>
+                        <option value="IN_STUDIO">In Studio (Preparing)</option>
+                        <option value="SHIPPED">Shipped</option>
+                        <option value="DELIVERED">Delivered</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Overview Analytics */}
+      {tab === "overview" && (
+        <div>
+          <div className="stats">
+            <div className="stat"><span className="meta">Orders</span><strong>38</strong><span className="eyebrow">↑ 12%</span></div>
+            <div className="stat"><span className="meta">Revenue</span><strong>₹96,400</strong><span className="eyebrow">↑ 22%</span></div>
+            <div className="stat"><span className="meta">Avg. order</span><strong>₹2,537</strong></div>
+            <div className="stat"><span className="meta">Low stock</span><strong>{items.filter(x => x.stock <= 3).length} pieces</strong></div>
+          </div>
+          <div className="admin-grid">
+            <div className="admin-card">
+              <h3>Revenue by week</h3>
+              <div className="bar-chart">{[42, 58, 47, 76, 62, 88, 95, 70].map((h, i) => <div className="bar" key={i} style={{ height: `${h}%` }} />)}</div>
+            </div>
+            <div className="admin-card">
+              <h3>Inventory attention</h3>
+              {items.slice(0, 5).map((p) => (
+                <div className="inventory-row" key={p.slug}>
+                  <span><strong>{p.name}</strong><br /><span className="meta">{p.kind}</span></span>
+                  <span className="status">{p.stock} left</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Staff Accounts */}
+      {tab === "staff" && (
+        <div className="admin-card">
+          <h3>Active Studio Members</h3>
+          <p className="meta" style={{ marginBottom: 20 }}>Users authorized to access Tanavi Studio backoffice</p>
+          <div className="inventory-row">
+            <span><strong>Deepika</strong><br /><span className="meta">admin@tanavidesigns.com</span></span>
+            <span className="status" style={{ background: "var(--rose)" }}>Owner / Admin</span>
+          </div>
+          <div className="inventory-row">
+            <span><strong>Studio Staff</strong><br /><span className="meta">staff@tanavidesigns.com</span></span>
+            <span className="status">Fulfillment & Inventory Staff</span>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Post New Piece */}
+      {showAddModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "grid", placeItems: "center" }}>
+          <div className="admin-card" style={{ width: "100%", maxWidth: 520, padding: 28, maxHeight: "90vh", overflow: "auto" }}>
+            <h3>➕ Post New Designer Piece</h3>
+            <form onSubmit={handleCreatePost}>
+              <div className="field">
+                <label>Name</label>
+                <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g. Ruhi" />
+              </div>
+              <div className="field-grid">
+                <div className="field">
+                  <label>Category</label>
+                  <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
+                    <option>Kurta sets</option>
+                    <option>Sarees</option>
+                    <option>Co-ords</option>
+                    <option>Dresses</option>
+                    <option>Dupattas</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Price (₹)</label>
+                  <input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })} required />
+                </div>
+              </div>
+              <div className="field-grid">
+                <div className="field">
+                  <label>Fabric</label>
+                  <input value={formData.fabric} onChange={(e) => setFormData({ ...formData, fabric: e.target.value })} required />
+                </div>
+                <div className="field">
+                  <label>Stock Quantity</label>
+                  <input type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })} required />
+                </div>
+              </div>
+              <div className="field">
+                <label>Image URL</label>
+                <input value={formData.image} onChange={(e) => setFormData({ ...formData, image: e.target.value })} required />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+                <button type="button" className="btn secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
+                <button type="submit" className="btn">Post Piece</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Piece */}
+      {editingItem && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "grid", placeItems: "center" }}>
+          <div className="admin-card" style={{ width: "100%", maxWidth: 480, padding: 28 }}>
+            <h3>✏️ Edit Piece: {editingItem.name}</h3>
+            <form onSubmit={handleEditSave}>
+              <div className="field">
+                <label>Name</label>
+                <input value={editingItem.name} onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })} required />
+              </div>
+              <div className="field-grid">
+                <div className="field">
+                  <label>Price (₹)</label>
+                  <input type="number" value={editingItem.price} onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })} required />
+                </div>
+                <div className="field">
+                  <label>Stock</label>
+                  <input type="number" value={editingItem.stock} onChange={(e) => setEditingItem({ ...editingItem, stock: Number(e.target.value) })} required />
+                </div>
+              </div>
+              <div className="field">
+                <label>Fabric</label>
+                <input value={editingItem.fabric} onChange={(e) => setEditingItem({ ...editingItem, fabric: e.target.value })} required />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+                <button type="button" className="btn secondary" onClick={() => setEditingItem(null)}>Cancel</button>
+                <button type="submit" className="btn">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm Delete */}
+      {deletingItem && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "grid", placeItems: "center" }}>
+          <div className="admin-card" style={{ width: "100%", maxWidth: 420, padding: 28, textAlign: "center" }}>
+            <h3 style={{ color: "#9b1c1c" }}>🗑️ Delete Piece?</h3>
+            <p className="meta">Are you sure you want to permanently delete <strong>{deletingItem.name}</strong> ({deletingItem.kind})? This action cannot be undone.</p>
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 24 }}>
+              <button className="btn secondary" onClick={() => setDeletingItem(null)}>Cancel</button>
+              <button className="btn" style={{ background: "#9b1c1c", borderColor: "#9b1c1c" }} onClick={() => handleDelete(deletingItem.slug)}>Confirm Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function AdminPageWrapper() {
+  const [user, setUser] = useState<{ email: string; role: string; name: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.authenticated) {
+          setUser(data.user);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUser(null);
+  };
+
+  if (loading) {
+    return (
+      <main className="admin" style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
+        <div className="meta">Verifying studio credentials…</div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <AdminLoginPage onLogin={(u) => setUser(u)} />;
+  }
+
+  return <AdminPortalPage user={user} onLogout={handleLogout} />;
+}
+
+export function Storefront(){const [mounted,setMounted]=useState(false);const [path,setPath]=useState("/");const [cart,setCart]=useState<{p:Product;q:number}[]>([]);useEffect(()=>{setMounted(true);if(typeof window!=="undefined"){setPath(window.location.pathname);try{setCart(JSON.parse(localStorage.getItem("tanavi-cart")||"[]"))}catch{}}const handlePop=()=>{if(typeof window!=="undefined")setPath(window.location.pathname)};window.addEventListener("popstate",handlePop);return ()=>window.removeEventListener("popstate",handlePop)},[]);const save=(next:{p:Product;q:number}[])=>{setCart(next);if(typeof window!=="undefined")localStorage.setItem("tanavi-cart",JSON.stringify(next))};const add=(p:Product)=>save(cart.some(x=>x.p.slug===p.slug)?cart.map(x=>x.p.slug===p.slug?{...x,q:x.q+1}:x):[...cart,{p,q:1}]);const update=(s:string,d:number)=>save(cart.map(x=>x.p.slug===s?{...x,q:Math.max(1,x.q+d)}:x));const remove=(s:string)=>save(cart.filter(x=>x.p.slug!==s));const wish=(p:Product)=>{if(typeof window==="undefined")return;const w=JSON.parse(localStorage.getItem("tanavi-wishlist")||"[]");if(!w.includes(p.slug))localStorage.setItem("tanavi-wishlist",JSON.stringify([...w,p.slug]))};const activePath=mounted?path:"/";const isSubdomainAdmin=typeof window!=="undefined"&&window.location.hostname.startsWith("admin.");let page:React.ReactNode;if(isSubdomainAdmin||activePath.startsWith("/admin")||activePath.startsWith("/staff"))return <AdminPageWrapper/>;else if(activePath==="/")page=<HomePage wish={wish}/>;else if(activePath==="/shop"||activePath.startsWith("/category/")||activePath.startsWith("/collections/"))page=<ShopPage wish={wish} path={activePath}/>;else if(activePath.startsWith("/products/"))page=<ProductPage add={add} wish={wish} path={activePath}/>;else if(activePath==="/cart")page=<CartPage cart={cart} update={update} remove={remove}/>;else if(activePath==="/checkout")page=<CheckoutPage cart={cart} clear={()=>save([])}/>;else if(activePath==="/search")page=<SearchPage/>;else if(activePath==="/payment/success")page=<SuccessPage/>;else if(activePath.startsWith("/orders/"))page=<OrderPage/>;else page=<div className="notfound"><h1>That page has wandered.</h1><a className="btn" href="/">Return home</a></div>;return <Layout cartCount={cart.reduce((a,x)=>a+x.q,0)}>{page}</Layout>}
+
