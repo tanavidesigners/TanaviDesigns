@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://tanavibydeepika.com"),
+  metadataBase: new URL("https://tanavidesigns.com"),
   title: { default: "Tanavi by Deepika — Indian Designer Clothing", template: "%s | Tanavi by Deepika" },
   description: "Thoughtfully made Indian clothing in small, considered editions. Sarees, kurta sets, co-ords and occasion wear, crafted slowly.",
   openGraph: {
