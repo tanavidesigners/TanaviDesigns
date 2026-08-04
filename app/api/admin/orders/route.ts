@@ -1,55 +1,51 @@
-import { NextResponse } from "next/server";
-import { getDb } from "@/db";
-import { orders, orderItems } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { NextResponse } from 'next/server';
+import { createAdminClient } from '../../../../lib/supabase/admin';
 
 export async function GET() {
   try {
-    const db = getDb();
-    const allOrders = await db.select().from(orders);
-    const allItems = await db.select().from(orderItems);
+    const supabase = createAdminClient();
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('*, items:order_items(*)')
+      .order('created_at', { ascending: false });
 
-    const result = allOrders.map((o) => {
-      const items = allItems.filter((i) => i.orderId === o.id);
-      return {
-        id: o.id,
-        orderNumber: o.orderNumber,
-        email: o.email,
-        phone: o.phone,
-        status: o.status,
-        total: o.totalPaise / 100,
-        createdAt: o.createdAt,
-        items: items.map((i) => ({
-          id: i.id,
-          productName: i.productName,
-          sku: i.sku,
-          size: i.size,
-          colour: i.colour,
-          quantity: i.quantity,
-          unitPrice: i.unitPricePaise / 100,
-        })),
-      };
-    });
-
-    return NextResponse.json({ orders: result });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch admin orders", details: String(error) }, { status: 500 });
+    return NextResponse.json({ orders: orders || [] });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-export async function PUT(req: Request) {
+export async function PUT(request: Request) {
   try {
-    const db = getDb();
-    const { orderId, status } = await req.json();
+    const body = await request.json();
+    const { orderId, status } = body;
 
     if (!orderId || !status) {
-      return NextResponse.json({ error: "Order ID and status are required" }, { status: 400 });
+      return NextResponse.json({ error: 'Missing orderId or status' }, { status: 400 });
     }
 
-    await db.update(orders).set({ status }).where(eq(orders.id, orderId));
+    const supabase = createAdminClient();
 
-    return NextResponse.json({ success: true, message: `Order status updated to ${status}` });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to update order status", details: String(error) }, { status: 500 });
+    const { data: order, error } = await supabase
+      .from('orders')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Record order status transition in history
+    await supabase.from('order_status_history').insert({
+      order_id: orderId,
+      status: status,
+      note: `Status updated to ${status} by admin`
+    });
+
+    return NextResponse.json({ success: true, order });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

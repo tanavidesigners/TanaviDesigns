@@ -1,15 +1,90 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { createAdminClient } from '../../../../../lib/supabase/admin';
+import { verifyRazorpaySignature } from '../../../../../lib/services/payment-service';
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(()=>null) as Record<string,string>|null;
-  const orderId=body?.razorpay_order_id, paymentId=body?.razorpay_payment_id, signature=body?.razorpay_signature;
-  const secret=process.env.RAZORPAY_KEY_SECRET;
-  if(!orderId||!paymentId||!signature||!secret) return NextResponse.json({error:"Invalid verification request"},{status:400});
-  const expected=createHmac("sha256",secret).update(`${orderId}|${paymentId}`).digest();
-  let supplied:Buffer; try{supplied=Buffer.from(signature,"hex")}catch{return NextResponse.json({error:"Invalid signature"},{status:400})}
-  if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected)) return NextResponse.json({error:"Invalid signature"},{status:401});
-  // A DB transaction must atomically enforce idempotency, capture payment, decrement inventory once,
-  // append order history, and clear the cart. Webhook remains the source of truth.
-  return NextResponse.json({verified:true,status:"AUTHORIZED"});
+  try {
+    const body = await request.json();
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, orderId } = body || {};
+
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !orderId) {
+      return NextResponse.json({ error: 'Missing payment verification tokens' }, { status: 400 });
+    }
+
+    const isValid = verifyRazorpaySignature({
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature
+    });
+
+    if (!isValid) {
+      return NextResponse.json({ error: 'Invalid payment signature verification' }, { status: 400 });
+    }
+
+    const supabase = createAdminClient();
+
+    // 1. Fetch Order & Order Items
+    const { data: order, error: orderErr } = await supabase
+      .from('orders')
+      .select('*, items:order_items(*)')
+      .eq('id', orderId)
+      .single();
+
+    if (orderErr || !order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    // 2. Update Payment Record to Captured
+    await supabase
+      .from('payments')
+      .update({
+        provider_payment_id: razorpayPaymentId,
+        provider_signature: razorpaySignature,
+        status: 'captured',
+        captured_at: new Date().toISOString()
+      })
+      .eq('order_id', order.id);
+
+    // 3. Convert Inventory Reservation to Sold if not already processed
+    if (order.status !== 'paid') {
+      const variantIds = order.items?.map((item: any) => item.variant_id).filter(Boolean) || [];
+      const quantities = order.items?.map((item: any) => item.quantity) || [];
+
+      if (variantIds.length > 0) {
+        await supabase.rpc('convert_reservation_to_sale', {
+          p_variant_ids: variantIds,
+          p_quantities: quantities,
+          p_order_id: order.id
+        });
+      }
+
+      // Update Order Status to Paid
+      await supabase
+        .from('orders')
+        .update({
+          status: 'paid',
+          payment_status: 'captured',
+          placed_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      // Record Order History
+      await supabase.from('order_status_history').insert({
+        order_id: order.id,
+        status: 'paid',
+        note: `Payment verified via Razorpay Payment ID: ${razorpayPaymentId}`
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      orderNumber: order.order_number
+    });
+  } catch (err: any) {
+    console.error('Razorpay Signature Verification Error:', err);
+    return NextResponse.json(
+      { error: err.message || 'Payment signature verification failed' },
+      { status: 500 }
+    );
+  }
 }

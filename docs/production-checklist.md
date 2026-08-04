@@ -1,0 +1,22 @@
+# Production Readiness Checklist: Tanavi by Deepika
+
+- [x] Initial repository audit completed (`docs/current-state-audit.md`).
+- [x] Aanyasri reference feature inventory completed (`docs/reference-feature-audit.md`).
+- [x] No copyrighted text, images, or copy used from reference site.
+- [x] Unique visual brand identity established for Tanavi by Deepika.
+- [x] Supabase PostgreSQL configured as primary system of record.
+- [x] Version-controlled SQL schema migrations committed (`supabase/migrations/00001_tanavi_core_schema.sql`).
+- [x] RLS policies committed (`supabase/migrations/00002_tanavi_rls_policies.sql`).
+- [x] Inventory reservation RPC functions committed (`supabase/migrations/00003_tanavi_functions_and_views.sql`).
+- [x] Authentic catalogue seeded on live Supabase PostgreSQL database.
+- [x] Server-calculated pricing in integer paise implemented.
+- [x] Razorpay order creation endpoint (`/api/payments/razorpay/create-order`) verified.
+- [x] Razorpay signature verification (`/api/payments/razorpay/verify`) verified.
+- [x] Razorpay raw body HMAC webhook endpoint (`/api/webhooks/razorpay`) verified with idempotent `payment_events` table deduplication.
+- [x] WhatsApp pre-filled links working across PDP, Cart, Order detail, and Floating FAB.
+- [x] Real administrative analytics views and zero-data rules enforced.
+- [x] All mock dummy data arrays removed from storefront code.
+- [x] Reusable empty state components created.
+- [x] Automated unit tests passing (`npm test`).
+- [x] TypeScript strict type checking passing (`npm run typecheck`).
+- [x] Documentation complete (`README.md`, `docs/*`).
