@@ -1,4 +1,4 @@
-name: Tanavi CI Pipeline
+name: Tanavi CI/CD Pipeline
 
 on:
   push:
@@ -37,3 +37,13 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: sb_publishable_nc4EgAvRw9x3jQIYXQ1-Jw_BBfHGSC8
           RAZORPAY_KEY_ID: rzp_test_key
           RAZORPAY_KEY_SECRET: test_secret
+
+      - name: Deploy to Hostinger VPS
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          if [ -n "${{ secrets.HOSTINGER_DEPLOY_WEBHOOK }}" ]; then
+            echo "Triggering Hostinger VPS Auto-deploy Webhook..."
+            curl -s -X POST "${{ secrets.HOSTINGER_DEPLOY_WEBHOOK }}"
+          else
+            echo "HOSTINGER_DEPLOY_WEBHOOK secret not configured yet."
+          fi
