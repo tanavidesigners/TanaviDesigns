@@ -1,6 +1,15 @@
 services:
   tanavi-designs:
-    build: .
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://tanavidesigns.com}
+        NEXT_PUBLIC_STORE_NAME: ${NEXT_PUBLIC_STORE_NAME:-"Tanavi by Deepika"}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://wnbckffbhhmxxjbetzvs.supabase.co}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-sb_publishable_nc4EgAvRw9x3jQIYXQ1-Jw_BBfHGSC8}
+        NEXT_PUBLIC_RAZORPAY_KEY_ID: ${NEXT_PUBLIC_RAZORPAY_KEY_ID:-rzp_test_tanavi_key_id}
+        NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-919482245679}
+        NEXT_PUBLIC_WHATSAPP_DEFAULT_MESSAGE: ${NEXT_PUBLIC_WHATSAPP_DEFAULT_MESSAGE:-"Hello Tanavi, I would like to know more about your latest designer collection."}
     container_name: tanavi-designs
     restart: always
     ports:
@@ -9,13 +18,18 @@ services:
       - "3000"
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_WHATSAPP_NUMBER=${NEXT_PUBLIC_WHATSAPP_NUMBER:-919482245679}
-      - NEXT_PUBLIC_WHATSAPP_DEFAULT_MESSAGE=${NEXT_PUBLIC_WHATSAPP_DEFAULT_MESSAGE:-Hello Tanavi, I would like to know more about your latest designer collection.}
-      - NEXT_PUBLIC_RAZORPAY_KEY_ID=${NEXT_PUBLIC_RAZORPAY_KEY_ID}
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
-      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://tanavidesigns.com}
+      - NEXT_PUBLIC_STORE_NAME=${NEXT_PUBLIC_STORE_NAME:-"Tanavi by Deepika"}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-https://wnbckffbhhmxxjbetzvs.supabase.co}
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-sb_publishable_nc4EgAvRw9x3jQIYXQ1-Jw_BBfHGSC8}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-sb_publishable_nc4EgAvRw9x3jQIYXQ1-Jw_BBfHGSC8}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:SupaBase@2026@db.wnbckffbhhmxxjbetzvs.supabase.co:5432/postgres}
+      - NEXT_PUBLIC_RAZORPAY_KEY_ID=${NEXT_PUBLIC_RAZORPAY_KEY_ID:-rzp_test_tanavi_key_id}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_tanavi_key_id}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-test_razorpay_secret_key_12345}
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET:-test_webhook_secret_key_12345}
+      - NEXT_PUBLIC_WHATSAPP_NUMBER=${NEXT_PUBLIC_WHATSAPP_NUMBER:-919482245679}
+      - NEXT_PUBLIC_WHATSAPP_DEFAULT_MESSAGE=${NEXT_PUBLIC_WHATSAPP_DEFAULT_MESSAGE:-"Hello Tanavi, I would like to know more about your latest designer collection."}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tanavi.rule=Host(`tanavidesigns.com`) || Host(`www.tanavidesigns.com`) || Host(`admin.tanavidesigns.com`)"
@@ -23,4 +37,3 @@ services:
       - "traefik.http.routers.tanavi.tls=true"
       - "traefik.http.routers.tanavi.tls.certresolver=letsencrypt"
       - "traefik.http.services.tanavi.loadbalancer.server.port=3000"
-
