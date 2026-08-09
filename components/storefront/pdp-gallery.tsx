@@ -11,23 +11,26 @@ export function PDPGallery({
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
 
-  const currentImage = images[selectedIndex] || images[0] || 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=1200&q=85';
+  const validImages = images.filter((_, idx) => !failedImages[idx]);
+  const activeImages = validImages.length > 0 ? validImages : ['https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=1200&q=85'];
+  const currentImage = activeImages[selectedIndex] || activeImages[0];
 
   const handleNext = () => {
-    setSelectedIndex((prev) => (prev + 1) % images.length);
+    setSelectedIndex((prev) => (prev + 1) % activeImages.length);
   };
 
   const handlePrev = () => {
-    setSelectedIndex((prev) => (prev - 1 + images.length) % images.length);
+    setSelectedIndex((prev) => (prev - 1 + activeImages.length) % activeImages.length);
   };
 
   return (
-    <div style={{ display: 'flex', gap: 16 }}>
+    <div style={{ display: 'flex', gap: 16, width: '100%' }}>
       {/* Thumbnail Bar (if multiple images) */}
-      {images.length > 1 && (
+      {activeImages.length > 1 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 80 }}>
-          {images.map((imgUrl, idx) => (
+          {activeImages.map((imgUrl, idx) => (
             <button
               key={idx}
               onClick={() => setSelectedIndex(idx)}
@@ -45,6 +48,7 @@ export function PDPGallery({
               <img
                 src={imgUrl}
                 alt={`${productName} thumbnail ${idx + 1}`}
+                onError={() => setFailedImages((prev) => ({ ...prev, [idx]: true }))}
                 style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }}
               />
             </button>
@@ -69,6 +73,9 @@ export function PDPGallery({
           <img
             src={currentImage}
             alt={productName}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=1200&q=85';
+            }}
             style={{
               width: '100%',
               height: 'auto',
@@ -139,7 +146,7 @@ export function PDPGallery({
           </button>
 
           {/* Previous Arrow */}
-          {images.length > 1 && (
+          {activeImages.length > 1 && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -181,6 +188,9 @@ export function PDPGallery({
             <img
               src={currentImage}
               alt={`${productName} full view`}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=1200&q=85';
+              }}
               style={{
                 width: 'auto',
                 height: 'auto',
@@ -193,7 +203,7 @@ export function PDPGallery({
           </div>
 
           {/* Next Arrow */}
-          {images.length > 1 && (
+          {activeImages.length > 1 && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
