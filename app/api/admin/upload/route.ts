@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 
 export async function POST(request: Request) {
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Selected file must be an image (JPEG, PNG, WebP)' }, { status: 400 });
     }
 
+    // Generate clean unique filename
     const fileExt = file.name.split('.').pop() || 'jpg';
     const sanitizeName = file.name
       .replace(/\.[^/.]+$/, '')
@@ -27,48 +29,54 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Bypass unenv framework polyfill by loading un-stubbed native Node fs
+    // Bypass framework stubs using node:module createRequire to load real native Node fs
     let written = false;
-    try {
-      const realFs = (globalThis as any).process?.mainModule?.require
-        ? (globalThis as any).process.mainModule.require('node:fs')
-        : (await import('node:fs')).default || (await import('node:fs'));
+    let writeErr = '';
 
-      if (realFs && typeof realFs.writeFileSync === 'function') {
-        if (typeof realFs.existsSync === 'function' && !realFs.existsSync(uploadsDir)) {
-          realFs.mkdirSync(uploadsDir, { recursive: true });
-        }
-        realFs.writeFileSync(filePath, buffer);
-        written = true;
+    try {
+      const nativeRequire = createRequire(import.meta.url);
+      const fs = nativeRequire('fs');
+
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
       }
-    } catch (e: any) {
-      console.warn('Native fs bypass attempt failed:', e?.message);
+
+      fs.writeFileSync(filePath, buffer);
+      written = true;
+    } catch (err: any) {
+      writeErr = err?.message || String(err);
     }
 
-    // Fallback: Use Supabase Storage if native fs is completely blocked by unenv
-    let publicUrl = `/uploads/${fileName}`;
+    // Secondary Linux child_process fallback if module require is intercepted
+    if (!written) {
+      try {
+        const nativeRequire = createRequire(import.meta.url);
+        const childProcess = nativeRequire('child_process');
+        childProcess.execSync(`mkdir -p "${uploadsDir}"`);
+        const fs = nativeRequire('fs');
+        fs.writeFileSync(filePath, buffer);
+        written = true;
+      } catch (cpErr: any) {
+        writeErr = cpErr?.message || String(cpErr);
+      }
+    }
 
     if (!written) {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wnbckffbhhmxxjbetzvs.supabase.co';
-      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_nc4EgAvRw9x3jQIYXQ1-Jw_BBfHGSC8';
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
-      const { data: uploadData } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, buffer, { contentType: file.type || 'image/jpeg', upsert: true });
-
-      if (uploadData) {
-        const { data: publicUrlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-        publicUrl = publicUrlData.publicUrl;
-      }
+      return NextResponse.json(
+        { error: `Hostinger VPS disk write failed: ${writeErr}` },
+        { status: 500 }
+      );
     }
+
+    const publicUrl = `/uploads/${fileName}`;
+
+    console.log(`[HOSTINGER VPS STORAGE] Successfully saved image to VPS disk: ${filePath}`);
 
     return NextResponse.json({
       success: true,
       url: publicUrl,
       fileName,
-      storage: written ? 'Hostinger VPS Local Storage' : 'Supabase Storage'
+      storage: 'Hostinger VPS Local Storage'
     });
   } catch (error: any) {
     console.error('Hostinger VPS Local Upload Error:', error);
