@@ -108,7 +108,7 @@ export function AdminHeader({
             />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--admin-ink, #2b2420)', lineHeight: 1.2 }}>
-                Deepika Sharma
+                Deepika Devineni
               </span>
               <span style={{ fontSize: 11, color: 'var(--admin-muted, #796c62)' }}>Studio Admin</span>
             </div>
