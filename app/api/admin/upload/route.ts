@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '../../../../lib/supabase/admin';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export async function POST(request: Request) {
   try {
@@ -15,55 +16,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Selected file must be an image (JPEG, PNG, WebP)' }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
-    const bucketName = 'product-images';
+    // Generate clean unique filename
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const sanitizeName = file.name
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9]/g, '-')
+      .toLowerCase();
+    const fileName = `${Date.now()}-${sanitizeName}.${fileExt}`;
 
-    // Ensure bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets?.some((b) => b.name === bucketName);
+    // Target upload path on Hostinger VPS disk (/public/uploads)
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
 
-    if (!bucketExists) {
-      await supabase.storage.createBucket(bucketName, { public: true });
+    if (!fs.existsSync(uploadsDir)) {
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
     }
 
-    // Generate unique storage filename
-    const fileExt = file.name.split('.').pop() || 'jpg';
-    const sanitizeName = file.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-    const fileName = `${Date.now()}-${sanitizeName}.${fileExt}`;
-    const filePath = `catalog/${fileName}`;
-
+    const filePath = path.join(uploadsDir, fileName);
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, buffer, {
-        contentType: file.type,
-        upsert: true
-      });
+    // Save image to Hostinger VPS Disk Storage ($0 cost, 60GB+ space)
+    await fs.promises.writeFile(filePath, buffer);
 
-    if (uploadError) {
-      console.error('Supabase storage upload error:', uploadError);
-      return NextResponse.json(
-        { error: `Upload to Supabase Storage failed: ${uploadError.message}` },
-        { status: 500 }
-      );
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-    const publicUrl = urlData.publicUrl;
+    // Return the relative public image URL
+    const publicUrl = `/uploads/${fileName}`;
 
     return NextResponse.json({
       success: true,
       url: publicUrl,
-      fileName
+      fileName,
+      storage: 'Hostinger VPS Local Storage'
     });
   } catch (error: any) {
-    console.error('Image upload error:', error);
+    console.error('Hostinger local upload error:', error);
     return NextResponse.json(
-      { error: error.message || 'Image upload failed' },
+      { error: error.message || 'Hostinger image upload failed' },
       { status: 500 }
     );
   }
