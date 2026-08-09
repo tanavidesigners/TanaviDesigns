@@ -23,13 +23,17 @@ export async function POST(request: Request) {
       .toLowerCase();
     const fileName = `${Date.now()}-${sanitizeName}.${fileExt}`;
 
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    // Ensure path resolves to /app/public/uploads inside Docker container
+    const baseDir = process.cwd() === '/' ? '/app' : process.cwd();
+    const uploadsDir = path.join(baseDir, 'public', 'uploads');
+    const distUploadsDir = path.join(baseDir, 'dist', 'client', 'uploads');
+
     const filePath = path.join(uploadsDir, fileName);
+    const distFilePath = path.join(distUploadsDir, fileName);
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Bypass framework stubs using node:module createRequire to load real native Node fs
     let written = false;
     let writeErr = '';
 
@@ -37,28 +41,25 @@ export async function POST(request: Request) {
       const nativeRequire = createRequire(import.meta.url);
       const fs = nativeRequire('fs');
 
+      // 1. Write to /app/public/uploads (Docker volume location)
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
-
       fs.writeFileSync(filePath, buffer);
+
+      // 2. Write to /app/dist/client/uploads (Vinext static client bundle location)
+      try {
+        if (!fs.existsSync(distUploadsDir)) {
+          fs.mkdirSync(distUploadsDir, { recursive: true });
+        }
+        fs.writeFileSync(distFilePath, buffer);
+      } catch (distErr: any) {
+        console.log('[dist write notice]', distErr?.message);
+      }
+
       written = true;
     } catch (err: any) {
       writeErr = err?.message || String(err);
-    }
-
-    // Secondary Linux child_process fallback if module require is intercepted
-    if (!written) {
-      try {
-        const nativeRequire = createRequire(import.meta.url);
-        const childProcess = nativeRequire('child_process');
-        childProcess.execSync(`mkdir -p "${uploadsDir}"`);
-        const fs = nativeRequire('fs');
-        fs.writeFileSync(filePath, buffer);
-        written = true;
-      } catch (cpErr: any) {
-        writeErr = cpErr?.message || String(cpErr);
-      }
     }
 
     if (!written) {
