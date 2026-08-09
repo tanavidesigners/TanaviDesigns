@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { AdminSidebar } from '../../../../components/admin/admin-sidebar';
+import { AdminHeader } from '../../../../components/admin/admin-header';
 
 export default function NewProductPage() {
   const [loading, setLoading] = useState(false);
@@ -12,10 +13,10 @@ export default function NewProductPage() {
     slug: '',
     sku: '',
     basePriceINR: '2450',
-    fabric: 'Cotton',
-    craft: 'Hand-Block Printing',
-    occasion: 'Everyday',
-    description: '',
+    fabric: 'Handloom Chanderi Silk',
+    craft: 'Gota Patti Work & Hand Embroidery',
+    occasion: 'Festive & Occasion Wear',
+    description: 'Introducing our luxury handcrafted silhouette, woven from pure Chanderi silk with intricate gota patti borders and artisan hand embroidery.',
     imageUrl: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=1200&q=85',
     status: 'active'
   });
@@ -75,138 +76,260 @@ export default function NewProductPage() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--admin-bg, #f7f4ee)' }}>
       <AdminSidebar currentTab="products" />
 
-      <main style={{ flex: 1, padding: 36 }}>
-        <div className="admin-top">
-          <div>
-            <span className="eyebrow">Catalogue Control</span>
-            <h1 style={{ margin: '6px 0', fontFamily: '"Fraunces", serif', fontSize: 32 }}>Add New Designer Product</h1>
-          </div>
-          <a className="btn secondary" href="/admin/products">
-            ← Back to Products
-          </a>
-        </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <AdminHeader title="Add New Designer Product" subtitle="Catalogue Control" />
 
-        {error && (
-          <div style={{ maxWidth: 720, margin: '20px 0', background: '#fde8e8', color: '#9b1c1c', padding: '12px 18px', borderRadius: 10 }}>
-            {error}
-          </div>
-        )}
+        <main style={{ flex: 1, padding: 36, maxWidth: 1100, margin: '0 auto', width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+            <div>
+              <h1 style={{ margin: 0, fontFamily: '"Fraunces", Georgia, serif', fontSize: 32, color: '#2b2420', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>
+                Add New Designer Product
+              </h1>
+              <span style={{ fontSize: 13, color: '#796c62' }}>Publish new artisanal pieces directly to your storefront catalogue</span>
+            </div>
 
-        <form className="admin-card" style={{ marginTop: 24, maxWidth: 720, padding: 32 }} onSubmit={handleSubmit}>
-          <div className="field">
-            <label>Product Title</label>
-            <input
-              required
-              value={formData.name}
-              onChange={(e) => {
-                const name = e.target.value;
-                const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                setFormData({ ...formData, name, slug, sku: `TNV-${slug.slice(0, 8).toUpperCase()}-26` });
+            <a
+              href="/admin/products"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '10px 18px',
+                borderRadius: 10,
+                background: '#ffffff',
+                border: '1px solid #e4ddd0',
+                color: '#7c5e4a',
+                fontWeight: 600,
+                fontSize: 13,
+                textDecoration: 'none'
               }}
-              placeholder="e.g. Meera Chanderi Anarkali Set"
-            />
+            >
+              ← Back to Products
+            </a>
           </div>
 
-          <div className="field-grid">
-            <div className="field">
-              <label>URL Slug</label>
-              <input required value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} />
+          {error && (
+            <div style={{ margin: '0 0 24px', background: '#fde8e8', color: '#9b1c1c', padding: '14px 20px', borderRadius: 12, fontSize: 13, border: '1px solid #f8b4b4' }}>
+              ⚠️ {error}
             </div>
-            <div className="field">
-              <label>SKU Code</label>
-              <input required value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} />
-            </div>
-          </div>
+          )}
 
-          <div className="field-grid">
-            <div className="field">
-              <label>Base Price (INR ₹)</label>
-              <input type="number" required value={formData.basePriceINR} onChange={(e) => setFormData({ ...formData, basePriceINR: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>Status</label>
-              <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                <option value="active">Active (Published)</option>
-                <option value="draft">Draft (Hidden)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="field-grid">
-            <div className="field">
-              <label>Fabric</label>
-              <input value={formData.fabric} onChange={(e) => setFormData({ ...formData, fabric: e.target.value })} placeholder="100% Breathable Cotton" />
-            </div>
-            <div className="field">
-              <label>Craft / Technique</label>
-              <input value={formData.craft} onChange={(e) => setFormData({ ...formData, craft: e.target.value })} placeholder="Hand-Block Printing" />
-            </div>
-          </div>
-
-          {/* Product Image Section: File Upload & URL Input */}
-          <div className="field" style={{ background: '#faf6f4', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
-            <label style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, display: 'block' }}>Product Photo</label>
-
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-              <label
-                className="btn secondary"
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 28 }}>
+              {/* Left Column: Product Details Form */}
+              <div
                 style={{
-                  cursor: uploading ? 'not-allowed' : 'pointer',
-                  fontSize: 13,
-                  padding: '10px 18px',
-                  background: '#fff',
-                  border: '1px solid var(--border)'
+                  background: '#ffffff',
+                  border: '1px solid #e4ddd0',
+                  borderRadius: 16,
+                  padding: 32,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
                 }}
               >
-                {uploading ? 'Uploading Photo…' : '📁 Upload Image File from Device'}
-                <input
-                  type="file"
-                  accept="image/png, image/jpeg, image/webp"
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                  style={{ display: 'none' }}
-                />
-              </label>
+                <div className="field">
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#2b2420', marginBottom: 6, display: 'block' }}>Product Title</label>
+                  <input
+                    required
+                    value={formData.name}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                      setFormData({ ...formData, name, slug, sku: `TNV-${slug.slice(0, 8).toUpperCase()}-26` });
+                    }}
+                    placeholder="e.g. Meera Chanderi Anarkali Set"
+                    style={{ padding: '12px 16px', fontSize: 14, borderRadius: 10, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%' }}
+                  />
+                </div>
 
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>or paste URL below</span>
-            </div>
+                <div className="field-grid" style={{ marginTop: 16 }}>
+                  <div className="field">
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#2b2420', marginBottom: 6, display: 'block' }}>URL Slug</label>
+                    <input
+                      required
+                      value={formData.slug}
+                      onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                      style={{ padding: '12px 16px', fontSize: 13, borderRadius: 10, border: '1px solid #e4ddd0', background: '#f7f4ee', width: '100%' }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#2b2420', marginBottom: 6, display: 'block' }}>SKU Code</label>
+                    <input
+                      required
+                      value={formData.sku}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                      style={{ padding: '12px 16px', fontSize: 13, borderRadius: 10, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%' }}
+                    />
+                  </div>
+                </div>
 
-            <div style={{ marginTop: 12 }}>
-              <input
-                required
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="https://..."
-                style={{ fontSize: 13, background: '#fff' }}
-              />
-            </div>
+                <div className="field-grid" style={{ marginTop: 16 }}>
+                  <div className="field">
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#2b2420', marginBottom: 6, display: 'block' }}>Base Price (INR ₹)</label>
+                    <input
+                      type="number"
+                      required
+                      value={formData.basePriceINR}
+                      onChange={(e) => setFormData({ ...formData, basePriceINR: e.target.value })}
+                      style={{ padding: '12px 16px', fontSize: 14, borderRadius: 10, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%' }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#2b2420', marginBottom: 6, display: 'block' }}>Publish Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      style={{ padding: '12px 16px', fontSize: 13, borderRadius: 10, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%' }}
+                    >
+                      <option value="active">Active (Published)</option>
+                      <option value="draft">Draft (Hidden)</option>
+                    </select>
+                  </div>
+                </div>
 
-            {/* Thumbnail Preview */}
-            {formData.imageUrl && (
-              <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
-                <img
-                  src={formData.imageUrl}
-                  alt="Product Preview"
-                  style={{ width: 70, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
-                />
-                <span style={{ fontSize: 12, color: '#137333', fontWeight: 500 }}>✓ Image Preview Loaded</span>
+                <div className="field-grid" style={{ marginTop: 16 }}>
+                  <div className="field">
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#2b2420', marginBottom: 6, display: 'block' }}>Fabric Composition</label>
+                    <input
+                      value={formData.fabric}
+                      onChange={(e) => setFormData({ ...formData, fabric: e.target.value })}
+                      placeholder="Handloom Chanderi Silk"
+                      style={{ padding: '12px 16px', fontSize: 13, borderRadius: 10, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%' }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#2b2420', marginBottom: 6, display: 'block' }}>Craft & Technique</label>
+                    <input
+                      value={formData.craft}
+                      onChange={(e) => setFormData({ ...formData, craft: e.target.value })}
+                      placeholder="Gota Patti Work & Hand Embroidery"
+                      style={{ padding: '12px 16px', fontSize: 13, borderRadius: 10, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="field" style={{ marginTop: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#2b2420', marginBottom: 6, display: 'block' }}>Description & Garment Specs</label>
+                  <textarea
+                    rows={5}
+                    required
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Handcrafted silhouette details..."
+                    style={{ padding: '14px 16px', fontSize: 13, borderRadius: 10, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%', lineHeight: 1.6 }}
+                  />
+                </div>
               </div>
-            )}
-          </div>
 
-          <div className="field">
-            <label>Description & Garment Details</label>
-            <textarea rows={4} required value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Handcrafted silhouette details..." />
-          </div>
+              {/* Right Column: Image Upload Box & Action Button */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e4ddd0',
+                    borderRadius: 16,
+                    padding: 24,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <label style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#2b2420', marginBottom: 14, display: 'block' }}>
+                    IMAGE UPLOAD
+                  </label>
 
-          <button className="btn full" disabled={loading || uploading} style={{ marginTop: 16 }}>
-            {loading ? 'Publishing Product…' : 'Publish Product to Store'}
-          </button>
-        </form>
-      </main>
+                  <div style={{ border: '2px dashed #e4ddd0', borderRadius: 14, padding: 16, textAlign: 'center', background: '#faf8f5' }}>
+                    {formData.imageUrl ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                        <img
+                          src={formData.imageUrl}
+                          alt="Product Preview"
+                          style={{
+                            width: '100%',
+                            maxHeight: 280,
+                            objectFit: 'cover',
+                            borderRadius: 10,
+                            border: '1px solid #e4ddd0'
+                          }}
+                        />
+                        <span style={{ fontSize: 12, color: '#796c62', fontWeight: 500 }}>
+                          ✓ High-Res Photo Loaded ($0 VPS Storage)
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '40px 20px', color: '#796c62' }}>
+                        <span style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>📷</span>
+                        <span style={{ fontSize: 13 }}>No photo selected yet</span>
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: 16 }}>
+                      <label
+                        style={{
+                          cursor: uploading ? 'not-allowed' : 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          width: '100%',
+                          padding: '12px 18px',
+                          borderRadius: 10,
+                          background: '#7c5e4a',
+                          color: '#ffffff',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          transition: 'background 0.2s'
+                        }}
+                      >
+                        {uploading ? 'Uploading Photo…' : 'Browse File 📤'}
+                        <input
+                          type="file"
+                          accept="image/png, image/jpeg, image/webp"
+                          onChange={handleFileUpload}
+                          disabled={uploading}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16 }}>
+                    <label style={{ fontSize: 11, color: '#796c62', marginBottom: 4, display: 'block' }}>Direct Image URL</label>
+                    <input
+                      required
+                      value={formData.imageUrl}
+                      onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                      placeholder="https://..."
+                      style={{ padding: '10px 14px', fontSize: 12, borderRadius: 8, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%' }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  disabled={loading || uploading}
+                  style={{
+                    width: '100%',
+                    padding: '16px 24px',
+                    borderRadius: 12,
+                    background: '#7c5e4a',
+                    color: '#ffffff',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    border: 'none',
+                    cursor: loading || uploading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 14px rgba(124, 94, 74, 0.25)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {loading ? 'Publishing Product…' : 'PUBLISH PRODUCT'}
+                </button>
+              </div>
+            </div>
+          </form>
+        </main>
+      </div>
     </div>
   );
 }
