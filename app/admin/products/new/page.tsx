@@ -8,6 +8,7 @@ export default function NewProductPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -21,23 +22,92 @@ export default function NewProductPage() {
     status: 'active'
   });
 
+  // Client-side image compression helper to avoid "Payload Too Large"
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const maxDim = 1600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error('Canvas compression failed'));
+            },
+            'image/jpeg',
+            0.85
+          );
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Instant local preview thumbnail
+    const localObjectUrl = URL.createObjectURL(file);
+    setPreviewUrl(localObjectUrl);
 
     setUploading(true);
     setError('');
 
     try {
-      const data = new FormData();
-      data.append('file', file);
+      // Compress file client-side if needed
+      let uploadBlob: Blob = file;
+      if (file.size > 1 * 1024 * 1024) {
+        try {
+          uploadBlob = await compressImage(file);
+        } catch {
+          uploadBlob = file;
+        }
+      }
+
+      const uploadData = new FormData();
+      uploadData.append('file', uploadBlob, file.name.replace(/\.[^/.]+$/, '.jpg'));
 
       const res = await fetch('/api/admin/upload', {
         method: 'POST',
-        body: data
+        body: uploadData
       });
 
-      const result = await res.json();
+      if (res.status === 413) {
+        throw new Error('Image size is too large. Please select an image under 10MB.');
+      }
+
+      const text = await res.text();
+      let result: any = {};
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error('Upload failed: Image server returned invalid response');
+      }
+
       if (!res.ok) {
         throw new Error(result.error || 'Failed to upload image');
       }
@@ -74,6 +144,8 @@ export default function NewProductPage() {
       setLoading(false);
     }
   };
+
+  const currentDisplayImage = previewUrl || formData.imageUrl;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--admin-bg, #f7f4ee)' }}>
@@ -239,11 +311,15 @@ export default function NewProductPage() {
                   </label>
 
                   <div style={{ border: '2px dashed #e4ddd0', borderRadius: 14, padding: 16, textAlign: 'center', background: '#faf8f5' }}>
-                    {formData.imageUrl ? (
+                    {currentDisplayImage ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                         <img
-                          src={formData.imageUrl}
+                          src={currentDisplayImage}
                           alt="Product Preview"
+                          onError={(err) => {
+                            // Fallback if image fails to load
+                            (err.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=600&q=80';
+                          }}
                           style={{
                             width: '100%',
                             maxHeight: 280,
@@ -253,7 +329,7 @@ export default function NewProductPage() {
                           }}
                         />
                         <span style={{ fontSize: 12, color: '#796c62', fontWeight: 500 }}>
-                          ✓ High-Res Photo Loaded ($0 VPS Storage)
+                          ✓ Photo Loaded Preview
                         </span>
                       </div>
                     ) : (
@@ -281,7 +357,7 @@ export default function NewProductPage() {
                           transition: 'background 0.2s'
                         }}
                       >
-                        {uploading ? 'Uploading Photo…' : 'Browse File 📤'}
+                        {uploading ? 'Compressing & Uploading…' : 'Browse File 📤'}
                         <input
                           type="file"
                           accept="image/png, image/jpeg, image/webp"
@@ -298,7 +374,10 @@ export default function NewProductPage() {
                     <input
                       required
                       value={formData.imageUrl}
-                      onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, imageUrl: e.target.value });
+                        setPreviewUrl('');
+                      }}
                       placeholder="https://..."
                       style={{ padding: '10px 14px', fontSize: 12, borderRadius: 8, border: '1px solid #e4ddd0', background: '#ffffff', width: '100%' }}
                     />
