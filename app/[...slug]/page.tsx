@@ -1,5 +1,5 @@
-import { Storefront } from "../storefront";
+import { notFound } from "next/navigation";
 
 export default function CatchAll() {
-  return <Storefront />;
+  notFound();
 }
