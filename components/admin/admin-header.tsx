@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 
 export function AdminHeader({
@@ -7,6 +9,15 @@ export function AdminHeader({
   title?: string;
   subtitle?: string;
 }) {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore network error on logout
+    }
+    window.location.href = '/admin/login';
+  };
+
   return (
     <header
       style={{
@@ -58,7 +69,7 @@ export function AdminHeader({
             border: '1px solid var(--admin-border, #e4ddd0)',
             borderRadius: 999,
             padding: '8px 16px',
-            width: 280
+            width: 260
           }}
         >
           <span style={{ fontSize: 13, color: 'var(--admin-muted, #796c62)' }}>⌕</span>
@@ -75,25 +86,8 @@ export function AdminHeader({
           />
         </div>
 
-        {/* Admin Profile & Notifications */}
+        {/* Admin Profile & Logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--admin-border, #e4ddd0)',
-              borderRadius: '50%',
-              width: 36,
-              height: 36,
-              display: 'grid',
-              placeItems: 'center',
-              cursor: 'pointer',
-              fontSize: 14
-            }}
-            aria-label="Notifications"
-          >
-            🔔
-          </button>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <img
               src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
@@ -113,6 +107,26 @@ export function AdminHeader({
               <span style={{ fontSize: 11, color: 'var(--admin-muted, #796c62)' }}>Studio Admin</span>
             </div>
           </div>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              background: '#faf8f5',
+              border: '1px solid var(--admin-border, #e4ddd0)',
+              borderRadius: 8,
+              padding: '6px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#c53030',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+            title="Sign out of Studio Admin"
+          >
+            Logout 🚪
+          </button>
         </div>
       </div>
     </header>

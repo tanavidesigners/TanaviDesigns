@@ -6,25 +6,47 @@ export default function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
   const { pathname } = url;
 
-  // Check if host is admin domain
   const isAdminDomain = host.startsWith('admin.');
+  const sessionToken = request.cookies.get('tanavi_session')?.value;
 
+  // Ignore internal assets, static files, and API endpoints
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/favicon') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+
+  // Handle Admin Domain (admin.tanavidesigns.com)
   if (isAdminDomain) {
-    // Ignore internal next assets, static files, and API endpoints
-    if (
-      pathname.startsWith('/_next') ||
-      pathname.startsWith('/api') ||
-      pathname.startsWith('/favicon') ||
-      pathname.includes('.')
-    ) {
-      return NextResponse.next();
+    if (pathname === '/admin/login' || pathname === '/login') {
+      if (sessionToken) {
+        url.pathname = '/admin';
+        return NextResponse.redirect(url);
+      }
+      url.pathname = '/admin/login';
+      return NextResponse.rewrite(url);
     }
 
-    // On admin subdomain, if accessing root '/', '/account' or any non-admin route,
-    // rewrite to the Admin Console
+    // Require authentication for all admin domain pages
+    if (!sessionToken) {
+      url.pathname = '/admin/login';
+      return NextResponse.redirect(url);
+    }
+
     if (pathname === '/' || !pathname.startsWith('/admin')) {
       url.pathname = '/admin';
       return NextResponse.rewrite(url);
+    }
+  }
+
+  // Handle Main Domain (/admin paths)
+  if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
+    if (!sessionToken) {
+      url.pathname = '/admin/login';
+      return NextResponse.redirect(url);
     }
   }
 
