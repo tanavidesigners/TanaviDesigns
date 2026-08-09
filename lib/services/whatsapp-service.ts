@@ -36,3 +36,44 @@ export function buildOrderSupportWhatsAppUrl(orderNumber: string): string {
   const text = `Hello Tanavi, I need assistance with my order *${orderNumber}*. Could you please share an update?`;
   return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
 }
+
+export function buildAdminOrderNotificationWhatsAppUrl(params: {
+  adminPhone: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  paymentMethod: string;
+  totalFormatted: string;
+  itemsSummary: string;
+  addressSummary: string;
+}): string {
+  const cleanPhone = params.adminPhone.replace(/[^0-9]/g, '');
+  const text = `🚨 *NEW ORDER PLACED (${params.paymentMethod.toUpperCase()})*\n\n` +
+    `*Order ID:* ${params.orderNumber}\n` +
+    `*Customer:* ${params.customerName} (${params.customerPhone})\n` +
+    `*Payment Method:* ${params.paymentMethod}\n` +
+    `*Total Amount:* ${params.totalFormatted}\n` +
+    `*Items:* ${params.itemsSummary}\n` +
+    `*Delivery Address:* ${params.addressSummary}\n\n` +
+    `Please process this order in Tanavi Studio Admin.`;
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+}
+
+export function buildCustomerOrderConfirmationWhatsAppUrl(params: {
+  customerPhone: string;
+  orderNumber: string;
+  customerName: string;
+  paymentMethod: string;
+  totalFormatted: string;
+  itemsSummary: string;
+}): string {
+  const cleanPhone = params.customerPhone.replace(/[^0-9]/g, '');
+  const text = `✨ *ORDER CONFIRMED - TANAVI BY DEEPIKA*\n\n` +
+    `Dear ${params.customerName},\n` +
+    `Thank you for your purchase! We have received your order *${params.orderNumber}*.\n\n` +
+    `*Items:* ${params.itemsSummary}\n` +
+    `*Total Amount:* ${params.totalFormatted}\n` +
+    `*Payment Method:* ${params.paymentMethod}\n\n` +
+    `Your handcrafted apparel is being prepared in our studio.`;
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+}

@@ -9,6 +9,7 @@ export default function CheckoutPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod' | 'pay_later'>('razorpay');
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -49,69 +50,91 @@ export default function CheckoutPage() {
         quantity: i.quantity
       }));
 
-      // 1. Call server to create order & reserve inventory
-      const res = await fetch('/api/payments/razorpay/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items,
-          customer: formData
-        })
-      });
+      // Option 1: Prepaid / Online Payment (Razorpay)
+      if (paymentMethod === 'razorpay') {
+        const res = await fetch('/api/payments/razorpay/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items, customer: formData })
+        });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to initialize payment');
-      }
-
-      // 2. Open Razorpay Standard Checkout modal
-      const options = {
-        key: data.keyId,
-        amount: data.amountPaise,
-        currency: data.currency,
-        name: 'Tanavi by Deepika',
-        description: `Order ${data.orderNumber}`,
-        order_id: data.razorpayOrderId,
-        prefill: {
-          name: formData.fullName,
-          email: formData.email,
-          contact: formData.phone
-        },
-        theme: {
-          color: '#9E3850'
-        },
-        handler: async function (response: any) {
-          try {
-            // 3. Verify Razorpay Payment Signature
-            const verifyRes = await fetch('/api/payments/razorpay/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                orderId: data.orderId,
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature
-              })
-            });
-
-            const verifyData = await verifyRes.json();
-            if (verifyRes.ok && verifyData.success) {
-              localStorage.removeItem('tanavi_cart');
-              window.location.href = `/payment/success?order=${verifyData.orderNumber}`;
-            } else {
-              throw new Error(verifyData.error || 'Signature verification failed');
-            }
-          } catch (vErr: any) {
-            alert(`Payment verification error: ${vErr.message}`);
-          }
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to initialize payment');
         }
-      };
 
-      const rzp = new (window as any).Razorpay(options);
-      rzp.on('payment.failed', function (response: any) {
-        setError(`Payment Failed: ${response.error.description}`);
-      });
-      rzp.open();
+        const options = {
+          key: data.keyId,
+          amount: data.amountPaise,
+          currency: data.currency,
+          name: 'Tanavi by Deepika',
+          description: `Order ${data.orderNumber}`,
+          order_id: data.razorpayOrderId,
+          prefill: {
+            name: formData.fullName,
+            email: formData.email,
+            contact: formData.phone
+          },
+          theme: { color: '#7c5e4a' },
+          handler: async function (response: any) {
+            try {
+              const verifyRes = await fetch('/api/payments/razorpay/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: data.orderId,
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature
+                })
+              });
+
+              const verifyData = await verifyRes.json();
+              if (verifyRes.ok && verifyData.success) {
+                localStorage.removeItem('tanavi_cart');
+                window.location.href = `/payment/success?order=${verifyData.orderNumber}`;
+              } else {
+                throw new Error(verifyData.error || 'Signature verification failed');
+              }
+            } catch (vErr: any) {
+              alert(`Payment verification error: ${vErr.message}`);
+            }
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (response: any) {
+          setError(`Payment Failed: ${response.error.description}`);
+        });
+        rzp.open();
+      }
+      // Option 2 & 3: Cash on Delivery (COD) or Pay Later (Studio Reserve)
+      else {
+        const res = await fetch('/api/orders/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items,
+            customer: formData,
+            paymentMethod
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to process order');
+        }
+
+        // Open WhatsApp notification tab for Admin notification if available
+        if (data.adminWhatsAppUrl) {
+          try {
+            window.open(data.adminWhatsAppUrl, '_blank');
+          } catch {}
+        }
+
+        localStorage.removeItem('tanavi_cart');
+        window.location.href = `/payment/success?order=${data.orderNumber}&method=${paymentMethod}`;
+      }
     } catch (err: any) {
       setError(err.message || 'Checkout failed');
     } finally {
@@ -126,7 +149,7 @@ export default function CheckoutPage() {
       <main>
         <section className="page-hero">
           <span className="eyebrow">Secure Checkout</span>
-          <h1>Shipping & Payment</h1>
+          <h1>Shipping & Payment Method</h1>
         </section>
 
         {error && (
@@ -213,7 +236,6 @@ export default function CheckoutPage() {
                     <option value="Tamil Nadu">Tamil Nadu</option>
                     <option value="Maharashtra">Maharashtra</option>
                     <option value="Delhi">Delhi</option>
-                    <option value="Rajasthan">Rajasthan</option>
                     <option value="Gujarat">Gujarat</option>
                   </select>
                 </div>
@@ -230,10 +252,98 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </div>
+
+            {/* Payment Method Selector */}
+            <div className="checkout-section">
+              <h3>Select Payment Method</h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
+                {/* Method 1: Prepaid Razorpay */}
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    padding: 16,
+                    borderRadius: 12,
+                    border: paymentMethod === 'razorpay' ? '2px solid var(--accent, #7c5e4a)' : '1px solid var(--border)',
+                    background: paymentMethod === 'razorpay' ? '#faf6f4' : '#ffffff',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    value="razorpay"
+                    checked={paymentMethod === 'razorpay'}
+                    onChange={() => setPaymentMethod('razorpay')}
+                    style={{ width: 18, height: 18, accentColor: '#7c5e4a' }}
+                  />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: 14, color: 'var(--ink)' }}>💳 Online Payment (Prepaid)</strong>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Pay instantly via Razorpay (UPI, Google Pay, Credit/Debit Cards, Netbanking)</span>
+                  </div>
+                </label>
+
+                {/* Method 2: Cash on Delivery (COD) */}
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    padding: 16,
+                    borderRadius: 12,
+                    border: paymentMethod === 'cod' ? '2px solid var(--accent, #7c5e4a)' : '1px solid var(--border)',
+                    background: paymentMethod === 'cod' ? '#faf6f4' : '#ffffff',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    value="cod"
+                    checked={paymentMethod === 'cod'}
+                    onChange={() => setPaymentMethod('cod')}
+                    style={{ width: 18, height: 18, accentColor: '#7c5e4a' }}
+                  />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: 14, color: 'var(--ink)' }}>🚚 Cash on Delivery (COD)</strong>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Pay cash upon package delivery to your address</span>
+                  </div>
+                </label>
+
+                {/* Method 3: Pay Later / Studio Reserve */}
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    padding: 16,
+                    borderRadius: 12,
+                    border: paymentMethod === 'pay_later' ? '2px solid var(--accent, #7c5e4a)' : '1px solid var(--border)',
+                    background: paymentMethod === 'pay_later' ? '#faf6f4' : '#ffffff',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    value="pay_later"
+                    checked={paymentMethod === 'pay_later'}
+                    onChange={() => setPaymentMethod('pay_later')}
+                    style={{ width: 18, height: 18, accentColor: '#7c5e4a' }}
+                  />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: 14, color: 'var(--ink)' }}>🕒 Pay Later (Studio Reserve)</strong>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Reserve your piece for 48h; pay on delivery or studio pickup</span>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
 
           <aside className="summary">
-            <h3>Your Order</h3>
+            <h3>Your Order Summary</h3>
             {cart.map((x) => (
               <div className="summary-row" key={x.variantId}>
                 <span>
@@ -257,11 +367,17 @@ export default function CheckoutPage() {
             </div>
 
             <button className="btn full" disabled={loading || cart.length === 0}>
-              {loading ? 'Preparing Payment Gateway…' : `Pay Securely · ${formatMoney(totalPaise)}`}
+              {loading
+                ? 'Processing Order…'
+                : paymentMethod === 'razorpay'
+                ? `Pay Securely · ${formatMoney(totalPaise)}`
+                : paymentMethod === 'cod'
+                ? `Place COD Order · ${formatMoney(totalPaise)}`
+                : `Reserve & Pay Later · ${formatMoney(totalPaise)}`}
             </button>
 
             <p className="meta" style={{ lineHeight: 1.6, marginTop: 14, fontSize: 11 }}>
-              🔒 Payment encrypted and verified server-side with Razorpay (UPI, Credit/Debit Cards, Netbanking & Wallets).
+              📲 Orders automatically trigger instant WhatsApp & Email notifications to both you and our Studio Work Mobile team.
             </p>
           </aside>
         </form>
