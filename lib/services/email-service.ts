@@ -1,5 +1,3 @@
-import nodemailer from 'nodemailer';
-
 export interface OrderEmailData {
   orderNumber: string;
   customerName: string;
@@ -18,13 +16,14 @@ export interface OrderEmailData {
   }>;
 }
 
-export async function sendOrderConfirmationEmails(data: OrderEmailData, targetAdminEmail: string = 'tanavidesigns@gmail.com') {
+export async function sendOrderConfirmationEmails(data: OrderEmailData, targetAdminEmail: string = 'tanavidesigners@gmail.com') {
   try {
     const resendApiKey = process.env.RESEND_API_KEY || '';
-    const smtpHost = process.env.SMTP_HOST || 'smtp.hostinger.com';
-    const smtpPort = parseInt(process.env.SMTP_PORT || '465');
-    const smtpUser = process.env.SMTP_USER || '';
-    const smtpPass = process.env.SMTP_PASS || '';
+
+    if (!resendApiKey) {
+      console.warn('[EMAIL SERVICE WARNING] No RESEND_API_KEY provided in environment variables.');
+      return;
+    }
 
     // 1. Customer Email HTML Template
     const customerHtml = `
@@ -109,13 +108,30 @@ export async function sendOrderConfirmationEmails(data: OrderEmailData, targetAd
     `;
 
     // -------------------------------------------------------------
-    // Method A: Send via Resend REST API (if RESEND_API_KEY is set)
+    // Send via Resend REST API
     // -------------------------------------------------------------
-    if (resendApiKey) {
-      console.log(`[EMAIL SERVICE] Sending emails via Resend API for order ${data.orderNumber}...`);
+    console.log(`[EMAIL SERVICE] Sending order emails via Resend API for order ${data.orderNumber}...`);
 
-      // Send to Customer
-      await fetch('https://api.resend.com/emails', {
+    // Admin Alert Email
+    const adminRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Tanavi Studio Alerts <onboarding@resend.dev>',
+        to: [targetAdminEmail || 'tanavidesigners@gmail.com'],
+        subject: `🚨 New Order ${data.orderNumber} (${data.totalFormatted}) - ${data.customerName}`,
+        html: adminHtml
+      })
+    });
+    const adminData = await adminRes.json();
+    console.log('[RESEND API ADMIN EMAIL RESPONSE]:', adminData);
+
+    // Customer Email
+    if (data.customerEmail) {
+      const custRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${resendApiKey}`,
@@ -128,66 +144,10 @@ export async function sendOrderConfirmationEmails(data: OrderEmailData, targetAd
           html: customerHtml
         })
       });
-
-      // Send to Admin
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: 'Tanavi Studio Alerts <onboarding@resend.dev>',
-          to: [targetAdminEmail],
-          subject: `🚨 New Order ${data.orderNumber} (${data.totalFormatted}) - ${data.customerName}`,
-          html: adminHtml
-        })
-      });
-
-      console.log(`[EMAIL SERVICE] Successfully sent physical emails via Resend API to ${data.customerEmail} and ${targetAdminEmail}!`);
-      return;
+      const custData = await custRes.json();
+      console.log('[RESEND API CUSTOMER EMAIL RESPONSE]:', custData);
     }
-
-    // -------------------------------------------------------------
-    // Method B: Send via Nodemailer SMTP (if SMTP_USER/PASS are set)
-    // -------------------------------------------------------------
-    if (smtpUser && smtpPass) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass }
-      });
-
-      const fromAddress = smtpUser;
-
-      // Send Customer Email
-      await transporter.sendMail({
-        from: `"Tanavi by Deepika" <${fromAddress}>`,
-        to: data.customerEmail,
-        subject: `Order Confirmed: ${data.orderNumber} - Tanavi by Deepika`,
-        html: customerHtml
-      });
-
-      // Send Admin Email
-      await transporter.sendMail({
-        from: `"Tanavi Studio Bot" <${fromAddress}>`,
-        to: targetAdminEmail,
-        subject: `🚨 New Order ${data.orderNumber} (${data.totalFormatted}) - ${data.customerName}`,
-        html: adminHtml
-      });
-
-      console.log(`[EMAIL SERVICE] Successfully sent physical emails via Nodemailer SMTP to ${data.customerEmail} and ${targetAdminEmail}!`);
-      return;
-    }
-
-    // -------------------------------------------------------------
-    // Fallback: No credentials provided
-    // -------------------------------------------------------------
-    console.warn(`[EMAIL SERVICE WARNING] No SMTP_USER or RESEND_API_KEY configured in environment variables. Email payloads logged below:`);
-    console.log(`- Target Customer: ${data.customerEmail}`);
-    console.log(`- Target Admin: ${targetAdminEmail}`);
   } catch (error: any) {
-    console.error('[EMAIL SERVICE ERROR] Failed to send order emails:', error);
+    console.error('[EMAIL SERVICE ERROR] Failed to send order emails:', error?.message || error);
   }
 }
