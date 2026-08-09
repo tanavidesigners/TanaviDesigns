@@ -20,22 +20,13 @@ export interface OrderEmailData {
 
 export async function sendOrderConfirmationEmails(data: OrderEmailData, targetAdminEmail: string = 'tanavidesigns@gmail.com') {
   try {
+    const resendApiKey = process.env.RESEND_API_KEY || '';
     const smtpHost = process.env.SMTP_HOST || 'smtp.hostinger.com';
     const smtpPort = parseInt(process.env.SMTP_PORT || '465');
     const smtpUser = process.env.SMTP_USER || '';
     const smtpPass = process.env.SMTP_PASS || '';
 
-    // Create Transporter
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined
-    });
-
-    const fromAddress = smtpUser || 'care@tanavidesigns.com';
-
-    // 1. Customer Email Template
+    // 1. Customer Email HTML Template
     const customerHtml = `
       <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto; background: #faf8f5; padding: 32px; border: 1px solid #e4ddd0; border-radius: 16px;">
         <div style="text-align: center; border-bottom: 1px solid #e4ddd0; padding-bottom: 20px; margin-bottom: 24px;">
@@ -90,7 +81,7 @@ export async function sendOrderConfirmationEmails(data: OrderEmailData, targetAd
       </div>
     `;
 
-    // 2. Admin Email Template
+    // 2. Admin Email HTML Template
     const adminHtml = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; padding: 24px; border: 1px solid #e4ddd0; border-radius: 12px;">
         <h2 style="color: #7c5e4a; margin-top: 0;">🚨 New Order Received (${data.paymentMethod.toUpperCase()})</h2>
@@ -117,7 +108,59 @@ export async function sendOrderConfirmationEmails(data: OrderEmailData, targetAd
       </div>
     `;
 
+    // -------------------------------------------------------------
+    // Method A: Send via Resend REST API (if RESEND_API_KEY is set)
+    // -------------------------------------------------------------
+    if (resendApiKey) {
+      console.log(`[EMAIL SERVICE] Sending emails via Resend API for order ${data.orderNumber}...`);
+
+      // Send to Customer
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'Tanavi by Deepika <onboarding@resend.dev>',
+          to: [data.customerEmail],
+          subject: `Order Confirmed: ${data.orderNumber} - Tanavi by Deepika`,
+          html: customerHtml
+        })
+      });
+
+      // Send to Admin
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'Tanavi Studio Alerts <onboarding@resend.dev>',
+          to: [targetAdminEmail],
+          subject: `🚨 New Order ${data.orderNumber} (${data.totalFormatted}) - ${data.customerName}`,
+          html: adminHtml
+        })
+      });
+
+      console.log(`[EMAIL SERVICE] Successfully sent physical emails via Resend API to ${data.customerEmail} and ${targetAdminEmail}!`);
+      return;
+    }
+
+    // -------------------------------------------------------------
+    // Method B: Send via Nodemailer SMTP (if SMTP_USER/PASS are set)
+    // -------------------------------------------------------------
     if (smtpUser && smtpPass) {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass }
+      });
+
+      const fromAddress = smtpUser;
+
       // Send Customer Email
       await transporter.sendMail({
         from: `"Tanavi by Deepika" <${fromAddress}>`,
@@ -134,12 +177,16 @@ export async function sendOrderConfirmationEmails(data: OrderEmailData, targetAd
         html: adminHtml
       });
 
-      console.log(`[EMAIL SERVICE] Successfully dispatched confirmation emails for order ${data.orderNumber} to ${data.customerEmail} and ${targetAdminEmail}!`);
-    } else {
-      console.log(`[EMAIL SERVICE DEV LOG] Email payload generated for order ${data.orderNumber}:`);
-      console.log(`- Customer Email target: ${data.customerEmail}`);
-      console.log(`- Admin Email target: ${targetAdminEmail}`);
+      console.log(`[EMAIL SERVICE] Successfully sent physical emails via Nodemailer SMTP to ${data.customerEmail} and ${targetAdminEmail}!`);
+      return;
     }
+
+    // -------------------------------------------------------------
+    // Fallback: No credentials provided
+    // -------------------------------------------------------------
+    console.warn(`[EMAIL SERVICE WARNING] No SMTP_USER or RESEND_API_KEY configured in environment variables. Email payloads logged below:`);
+    console.log(`- Target Customer: ${data.customerEmail}`);
+    console.log(`- Target Admin: ${targetAdminEmail}`);
   } catch (error: any) {
     console.error('[EMAIL SERVICE ERROR] Failed to send order emails:', error);
   }
