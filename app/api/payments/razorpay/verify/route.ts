@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '../../../../../lib/supabase/admin';
 import { verifyRazorpaySignature } from '../../../../../lib/services/payment-service';
+import { sendOrderConfirmationEmails } from '../../../../../lib/services/email-service';
 
 export async function POST(request: Request) {
   try {
@@ -34,7 +35,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    // 2. Update Payment Record to Captured
+    // 2. Read Studio Settings
+    const { data: settingRow } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'studio_config')
+      .single();
+
+    const config = settingRow?.value || { admin_email: 'tanavidesigns@gmail.com' };
+
+    // 3. Update Payment Record to Captured
     await supabase
       .from('payments')
       .update({
@@ -45,7 +55,7 @@ export async function POST(request: Request) {
       })
       .eq('order_id', order.id);
 
-    // 3. Convert Inventory Reservation to Sold if not already processed
+    // 4. Convert Inventory Reservation to Sold if not already processed
     if (order.status !== 'paid') {
       const variantIds = order.items?.map((item: any) => item.variant_id).filter(Boolean) || [];
       const quantities = order.items?.map((item: any) => item.quantity) || [];
@@ -74,6 +84,36 @@ export async function POST(request: Request) {
         status: 'paid',
         note: `Payment verified via Razorpay Payment ID: ${razorpayPaymentId}`
       });
+
+      // 5. Trigger Confirmation Emails
+      const addr = order.shipping_address || {};
+      const addrStr = `${addr.line1 || ''}, ${addr.city || ''}, ${addr.state || ''} ${addr.pinCode || ''}`;
+      const formattedTotal = (order.grand_total / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+
+      const emailItems = order.items?.map((item: any) => ({
+        name: item.product_name,
+        size: item.size,
+        quantity: item.quantity,
+        priceFormatted: (item.line_total / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }),
+        imageUrl: item.image_url
+      })) || [];
+
+      const itemsSummary = emailItems.map((i: any) => `${i.name} (Size ${i.size}) × ${i.quantity}`).join(', ');
+
+      sendOrderConfirmationEmails(
+        {
+          orderNumber: order.order_number,
+          customerName: addr.fullName || 'Customer',
+          customerEmail: order.guest_email || 'customer@example.com',
+          customerPhone: order.guest_phone || addr.phone || '',
+          paymentMethod: 'Prepaid Online Payment (Razorpay)',
+          totalFormatted: formattedTotal,
+          itemsSummary,
+          addressSummary: addrStr,
+          items: emailItems
+        },
+        config.admin_email || 'tanavidesigns@gmail.com'
+      ).catch((e) => console.error('Razorpay verify email notification error:', e));
     }
 
     return NextResponse.json({

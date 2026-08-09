@@ -4,6 +4,7 @@ import {
   buildAdminOrderNotificationWhatsAppUrl,
   buildCustomerOrderConfirmationWhatsAppUrl
 } from '../../../../lib/services/whatsapp-service';
+import { sendOrderConfirmationEmails } from '../../../../lib/services/email-service';
 
 export async function POST(request: Request) {
   try {
@@ -172,7 +173,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 7. Generate WhatsApp Notification URLs
+    // 7. Generate WhatsApp Notification URLs & Email Payloads
     const formattedTotal = (totalPaise / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
     const itemsSummary = itemSummaryParts.join(', ');
     const addressSummary = `${customer.line1}, ${customer.city}, ${customer.state} ${customer.pinCode}`;
@@ -196,6 +197,30 @@ export async function POST(request: Request) {
       totalFormatted: formattedTotal,
       itemsSummary
     });
+
+    // 8. Trigger Email Notifications to Customer & Admin (tanavidesigns@gmail.com)
+    const emailItemDetails = orderItemsToInsert.map((item) => ({
+      name: item.product_name,
+      size: item.size,
+      quantity: item.quantity,
+      priceFormatted: (item.line_total / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }),
+      imageUrl: item.image_url
+    }));
+
+    sendOrderConfirmationEmails(
+      {
+        orderNumber,
+        customerName: customer.fullName,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        paymentMethod: paymentMethodLabel,
+        totalFormatted: formattedTotal,
+        itemsSummary,
+        addressSummary,
+        items: emailItemDetails
+      },
+      config.admin_email || 'tanavidesigns@gmail.com'
+    ).catch((e) => console.error('Background email notification error:', e));
 
     console.log(`[ORDER CREATED] ${paymentMethodLabel} Order ${orderNumber} created! Total: ${formattedTotal}`);
 
