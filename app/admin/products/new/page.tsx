@@ -32,7 +32,7 @@ export default function NewProductPage() {
     craft: 'Gota Patti Work & Hand Embroidery',
     occasion: 'Festive & Occasion Wear',
     description: 'Introducing our luxury handcrafted silhouette, woven from pure Chanderi silk with intricate gota patti borders and artisan hand embroidery.',
-    imageUrl: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=1200&q=85',
+    imageUrl: '',
     status: 'active',
     // Required Size Stock Configuration
     stockS: '',
