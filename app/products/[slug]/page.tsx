@@ -4,6 +4,7 @@ import { Footer } from '../../../components/shared/footer';
 import { AnnouncementBar } from '../../../components/shared/announcement-bar';
 import { ProductCard } from '../../../components/storefront/product-card';
 import { PDPInteractiveControls } from '../../../components/storefront/pdp-controls';
+import { PDPGallery } from '../../../components/storefront/pdp-gallery';
 import {
   getProductBySlug,
   getActiveProducts,
@@ -47,15 +48,9 @@ export default async function ProductDetailPage({
 
       <main>
         <section className="product-detail">
-          {/* Gallery */}
-          <div className="gallery">
-            {images.map((imgUrl, idx) => (
-              <img
-                src={imgUrl}
-                alt={`${product.name} view ${idx + 1}`}
-                key={idx}
-              />
-            ))}
+          {/* Interactive Lightbox Gallery */}
+          <div className="gallery" style={{ display: 'block' }}>
+            <PDPGallery images={images} productName={product.name} />
           </div>
 
           {/* Details & Controls */}
