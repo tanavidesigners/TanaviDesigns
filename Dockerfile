@@ -28,7 +28,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 COPY --from=builder /app ./
-RUN mkdir -p .wrangler/logs
+RUN mkdir -p .wrangler/logs public/uploads
 
 EXPOSE 3000
 CMD ["npm", "run", "start"]

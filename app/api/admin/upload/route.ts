@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import fs from 'node:fs';
 import path from 'node:path';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wnbckffbhhmxxjbetzvs.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_nc4EgAvRw9x3jQIYXQ1-Jw_BBfHGSC8';
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(request: Request) {
   try {
@@ -29,61 +24,27 @@ export async function POST(request: Request) {
       .toLowerCase();
     const fileName = `${Date.now()}-${sanitizeName}.${fileExt}`;
 
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    const filePath = path.join(uploadsDir, fileName);
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 1. Upload to Supabase Cloud Storage (100% immune to unenv fs.mkdir errors)
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('product-images')
-      .upload(fileName, buffer, {
-        contentType: file.type || 'image/jpeg',
-        upsert: true
-      });
+    // Save image directly to Hostinger VPS SSD Storage (/public/uploads)
+    await fs.promises.writeFile(filePath, buffer);
 
-    let finalPublicUrl = '';
-
-    if (!uploadError && uploadData) {
-      const { data: publicUrlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-      finalPublicUrl = publicUrlData.publicUrl;
-      console.log('✅ Uploaded image to Supabase Storage:', finalPublicUrl);
-    } else {
-      console.warn('Supabase Storage upload fallback, attempting local disk save...', uploadError);
-    }
-
-    // 2. Secondary local VPS storage fallback (if fs is available)
-    try {
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-      if (typeof fs.existsSync === 'function' && !fs.existsSync(uploadsDir)) {
-        if (typeof fs.mkdirSync === 'function') {
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-      }
-      const filePath = path.join(uploadsDir, fileName);
-      if (typeof fs.writeFileSync === 'function') {
-        fs.writeFileSync(filePath, buffer);
-        if (!finalPublicUrl) {
-          finalPublicUrl = `/uploads/${fileName}`;
-        }
-      }
-    } catch (fsError: any) {
-      console.log('[fs notice] unenv sandboxed fs.mkdir skipped:', fsError?.message);
-    }
-
-    if (!finalPublicUrl) {
-      // Data URL fallback if both fail
-      finalPublicUrl = `data:${file.type};base64,${buffer.toString('base64')}`;
-    }
+    const publicUrl = `/uploads/${fileName}`;
 
     return NextResponse.json({
       success: true,
-      url: finalPublicUrl,
+      url: publicUrl,
       fileName,
-      storage: 'Supabase Cloud Storage'
+      storage: 'Hostinger VPS SSD Local Storage'
     });
   } catch (error: any) {
-    console.error('Image upload error:', error);
+    console.error('Hostinger VPS Upload Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Image upload failed' },
+      { error: error.message || 'Hostinger image upload failed' },
       { status: 500 }
     );
   }
