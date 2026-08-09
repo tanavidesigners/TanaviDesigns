@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient();
 
-    // 1. Read Studio Configuration from site_settings (for admin phone & settings)
+    // 1. Read Studio Configuration from site_settings
     const { data: settingRow } = await supabase
       .from('site_settings')
       .select('value')
@@ -50,8 +50,9 @@ export async function POST(request: Request) {
         id,
         sku,
         size,
+        colour_name,
         price_override,
-        product:products(id, name, base_price)
+        product:products(id, name, slug, base_price, product_images(storage_path, is_primary))
       `)
       .in('id', variantIds);
 
@@ -68,15 +69,25 @@ export async function POST(request: Request) {
       if (!v) continue;
 
       const p = (v as any).product;
+      const images = p?.product_images || [];
+      const imgUrl = images.find((img: any) => img.is_primary)?.storage_path || images[0]?.storage_path || '';
+
       const unitPricePaise = v.price_override || p.base_price;
       const lineTotalPaise = unitPricePaise * item.quantity;
       subtotalPaise += lineTotalPaise;
 
       orderItemsToInsert.push({
+        product_id: p.id,
         variant_id: v.id,
-        quantity: item.quantity,
+        product_name: p.name,
+        product_slug: p.slug,
+        sku: v.sku,
+        size: v.size,
+        colour: v.colour_name || 'Original',
         unit_price: unitPricePaise,
-        total_price: lineTotalPaise
+        quantity: item.quantity,
+        line_total: lineTotalPaise,
+        image_url: imgUrl
       });
 
       itemSummaryParts.push(`${p.name} (Size ${v.size}) × ${item.quantity}`);
@@ -90,37 +101,32 @@ export async function POST(request: Request) {
     const orderNumber = `TNV-${dateStr}-${randomSuffix}`;
     const paymentMethodLabel = paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'Pay Later (Studio Reserve)';
 
-    // 3. Create Address Record
-    const { data: addr, error: addrErr } = await supabase
-      .from('addresses')
-      .insert({
-        full_name: customer.fullName,
-        phone: customer.phone,
-        line1: customer.line1,
-        line2: customer.line2 || '',
-        city: customer.city,
-        state: customer.state || 'Andhra Pradesh',
-        pin_code: customer.pinCode
-      })
-      .select()
-      .single();
+    const shippingAddressObj = {
+      fullName: customer.fullName,
+      phone: customer.phone,
+      line1: customer.line1,
+      line2: customer.line2 || '',
+      city: customer.city,
+      state: customer.state || 'Andhra Pradesh',
+      pinCode: customer.pinCode
+    };
 
-    if (addrErr) {
-      console.error('Address insertion error:', addrErr);
-    }
-
-    // 4. Create Order Record
+    // 3. Create Order Record in public.orders
     const { data: order, error: orderErr } = await supabase
       .from('orders')
       .insert({
         order_number: orderNumber,
-        shipping_address_id: addr?.id || null,
-        subtotal: subtotalPaise,
-        shipping_cost: shippingPaise,
-        total_amount: totalPaise,
-        order_status: 'pending_payment',
+        guest_email: customer.email,
+        guest_phone: customer.phone,
+        status: 'pending_payment',
+        payment_status: 'pending',
         fulfilment_status: 'unfulfilled',
-        notes: `Placed via ${paymentMethodLabel}`
+        currency: 'INR',
+        subtotal: subtotalPaise,
+        shipping_total: shippingPaise,
+        grand_total: totalPaise,
+        shipping_address: shippingAddressObj,
+        customer_notes: `Placed via ${paymentMethodLabel}`
       })
       .select()
       .single();
@@ -130,7 +136,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: orderErr?.message || 'Failed to create order record' }, { status: 500 });
     }
 
-    // 5. Create Order Items
+    // 4. Create Order Items in public.order_items
     for (const itemRow of orderItemsToInsert) {
       await supabase.from('order_items').insert({
         order_id: order.id,
@@ -138,16 +144,18 @@ export async function POST(request: Request) {
       });
     }
 
-    // 6. Create Payment Record
+    // 5. Create Payment Record in public.payments
     await supabase.from('payments').insert({
       order_id: order.id,
-      payment_method: paymentMethod,
+      provider: paymentMethod.toUpperCase(),
+      provider_order_id: orderNumber,
       amount: totalPaise,
       currency: 'INR',
-      status: 'pending'
+      status: 'pending',
+      method: paymentMethod
     });
 
-    // 7. Deduct Inventory
+    // 6. Deduct Inventory in public.inventory
     for (const item of items) {
       const { data: inv } = await supabase
         .from('inventory')
@@ -164,7 +172,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 8. Generate WhatsApp URLs
+    // 7. Generate WhatsApp Notification URLs
     const formattedTotal = (totalPaise / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
     const itemsSummary = itemSummaryParts.join(', ');
     const addressSummary = `${customer.line1}, ${customer.city}, ${customer.state} ${customer.pinCode}`;
@@ -189,7 +197,7 @@ export async function POST(request: Request) {
       itemsSummary
     });
 
-    console.log(`[ORDER NOTIFICATION] New ${paymentMethodLabel} Order ${orderNumber} created! Total: ${formattedTotal}`);
+    console.log(`[ORDER CREATED] ${paymentMethodLabel} Order ${orderNumber} created! Total: ${formattedTotal}`);
 
     return NextResponse.json({
       success: true,
